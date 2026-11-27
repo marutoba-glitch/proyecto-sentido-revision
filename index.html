@@ -224,6 +224,10 @@ textarea.campo{min-height:96px;resize:vertical}
 .tconv__frase{font-family:var(--titulo);font-weight:600;font-size:1.15rem;line-height:1.35;color:var(--cafe);margin:0 0 .5em;min-height:2.6em}
 .tconv__frase.vacia{font-family:var(--texto);font-weight:400;font-size:.95rem;color:#9b8b7d}
 .tconv .opciones{flex-direction:column;gap:8px}
+.escena-op--propia span{border-style:dashed}
+.escena-op--propia b{font-size:.95em}
+.campo--tarjeta{min-height:92px;font-family:var(--titulo);font-weight:600;font-size:1.05rem;color:var(--cafe);background:#FFFEFA}
+.ayuda-tarjeta{margin:.4em 0 0;font-size:.85rem;color:#7d6c5e}
 .tconv .op span{min-height:44px;font-size:.95rem;width:100%}
 
 /* Para llevar (bloque destacado) */
@@ -573,6 +577,7 @@ dialog.visor::backdrop{background:rgba(40,28,18,.6)}
             <label class="escena-op"><input type="radio" name="d19-escena" value="A"><span><b aria-hidden="true">A</b>Respondí con prisa mientras organizábamos la cena.</span></label>
             <label class="escena-op"><input type="radio" name="d19-escena" value="B"><span><b aria-hidden="true">B</b>Confirmé una visita sin consultar.</span></label>
             <label class="escena-op"><input type="radio" name="d19-escena" value="C"><span><b aria-hidden="true">C</b>Solté un comentario brusco al repartir las tareas.</span></label>
+            <label class="escena-op escena-op--propia"><input type="radio" name="d19-escena" value="D"><span><b aria-hidden="true">✎</b>Crea tu propia escena</span></label>
           </fieldset>
         </section>
 
@@ -582,6 +587,11 @@ dialog.visor::backdrop{background:rgba(40,28,18,.6)}
             <div class="tconv">
               <p class="tconv__n">Tarjeta 1 · Reconozco lo que pasó</p>
               <p class="tconv__frase vacia" id="d19-t1">Elige una escena para ver esta tarjeta.</p>
+              <div id="d19-propia-bloque" hidden>
+                <label class="sr-only" for="d19-propia">Escribe lo que pasó</label>
+                <textarea class="campo campo--tarjeta" id="d19-propia" rows="3" maxlength="200" placeholder="Ej.: Te interrumpí cuando me contabas cómo te fue."></textarea>
+                <p class="ayuda-tarjeta">Escribe lo que pasó, en pocas palabras y a tu manera.</p>
+              </div>
             </div>
             <div class="tconv">
               <p class="tconv__n" id="d19-t2-t">Tarjeta 2 · Y ahora…</p>
@@ -673,7 +683,8 @@ var D8 = {
 var D19 = {
   A:{rec:"Te respondí de golpe.", escuchar:"Quiero escucharte bien. ¿Podemos retomar lo que me decías?", paso:"Todavía tenemos varias cosas encima. ¿Te parece si acordamos qué urge y dejamos el resto para después?"},
   B:{rec:"Confirmé la visita sin preguntarte.", escuchar:"Quiero saber cómo te queda ese plan.", paso:"Si ese horario nos complica, puedo escribir para proponer otro. ¿Lo revisamos?"},
-  C:{rec:"El comentario que hice fue brusco. Perdón.", escuchar:"Quiero hablar de las tareas con más calma.", paso:"¿Podemos repartir lo que falta y dejar fuera lo que hoy no alcance?"}
+  C:{rec:"El comentario que hice fue brusco. Perdón.", escuchar:"Quiero hablar de las tareas con más calma.", paso:"¿Podemos repartir lo que falta y dejar fuera lo que hoy no alcance?"},
+  D:{rec:"", escuchar:"Quiero escucharte bien. ¿Podemos hablarlo con calma?", paso:"¿Te parece si vemos juntos cómo seguir?"}
 };
 
 var estado = {
@@ -993,32 +1004,51 @@ function frase(s){ s = s.trim(); if (!s) return s; s = s.charAt(0).toUpperCase()
 (function(){
   var raiz = $("#pantalla-dia-19"), llevar = $("#d19-llevar"), ta = $("#d19-frase");
   var esc = $$('input[name="d19-escena"]', raiz), sig = $$('input[name="d19-sigue"]', raiz);
-  var t1 = $("#d19-t1"), t2 = $("#d19-t2");
+  var t1 = $("#d19-t1"), t2 = $("#d19-t2"), pb = $("#d19-propia-bloque"), pr = $("#d19-propia");
+  if (estado.d19.propia == null) estado.d19.propia = "";
+  function reconozco(e){
+    if (e !== "D") return D19[e].rec;
+    var x = String(estado.d19.propia || "").replace(/\s+/g, " ").trim();
+    if (!x) return "";
+    x = x.charAt(0).toUpperCase() + x.slice(1);
+    return /[.!?…]$/.test(x) ? x : x + ".";
+  }
+  function componer(){ var e = estado.d19.escena, s = estado.d19.sigue; return reconozco(e) + " " + D19[e][s]; }
   function pintar(){
-    var e = estado.d19.escena, s = estado.d19.sigue;
-    esc.forEach(function(r){ r.checked = r.value === e; });
-    sig.forEach(function(r){ r.disabled = !e; r.checked = r.value === s; });
-    if (e) { t1.textContent = "«" + D19[e].rec + "»"; t1.classList.remove("vacia"); }
-    else { t1.textContent = "Elige una escena para ver esta tarjeta."; t1.classList.add("vacia"); }
+    var e = estado.d19.escena, s = estado.d19.sigue, propia = e === "D", r = e ? reconozco(e) : "";
+    esc.forEach(function(x){ x.checked = x.value === e; });
+    sig.forEach(function(x){ x.disabled = !e; x.checked = x.value === s; });
+    pb.hidden = !propia; t1.hidden = propia;
+    if (propia && pr.value !== estado.d19.propia) pr.value = estado.d19.propia;
+    if (e && !propia) { t1.textContent = "«" + r + "»"; t1.classList.remove("vacia"); }
+    else if (!e) { t1.textContent = "Elige una escena para ver esta tarjeta."; t1.classList.add("vacia"); }
     if (e && s) { t2.textContent = "«" + D19[e][s] + "»"; t2.classList.remove("vacia"); }
     else { t2.textContent = e ? "Elige cómo quieres seguir." : "Primero elige una escena."; t2.classList.add("vacia"); }
-    if (e && s) { llevar.classList.add("is-on"); ta.value = estado.d19.frase; } else llevar.classList.remove("is-on");
+    var listo = e && s && r;
+    if (listo) { llevar.classList.add("is-on"); ta.value = estado.d19.frase; } else llevar.classList.remove("is-on");
+    if (propia && s && !r) { t2.textContent = "Escribe lo que pasó en la tarjeta 1 para armar tu frase."; t2.classList.add("vacia"); }
   }
-  esc.forEach(function(r){
-    r.addEventListener("change", function(){
-      estado.d19.escena = r.value; estado.d19.sigue = ""; estado.d19.frase = ""; guardar();
-      limpiarCopia($("#d19-cb")); pintar(); revelar(t1);
+  esc.forEach(function(x){
+    x.addEventListener("change", function(){
+      estado.d19.escena = x.value; estado.d19.sigue = ""; estado.d19.frase = ""; estado.d19.editada = false; guardar();
+      limpiarCopia($("#d19-cb")); pintar();
+      if (x.value === "D") { revelar(pb); pr.focus({preventScroll:true}); } else revelar(t1);
     });
   });
-  sig.forEach(function(r){
-    r.addEventListener("change", function(){
-      var e = estado.d19.escena; estado.d19.sigue = r.value;
-      estado.d19.frase = D19[e].rec + " " + D19[e][r.value]; guardar();
-      limpiarCopia($("#d19-cb")); pintar(); revelar(t2); revelar(llevar);
-      anunciar("Tu frase está lista en Para llevar: " + estado.d19.frase);
+  pr.addEventListener("input", function(){
+    estado.d19.propia = pr.value;
+    if (estado.d19.sigue && !estado.d19.editada) estado.d19.frase = componer();
+    guardar(); pintar();
+  });
+  sig.forEach(function(x){
+    x.addEventListener("change", function(){
+      estado.d19.sigue = x.value; estado.d19.editada = false;
+      estado.d19.frase = componer(); guardar();
+      limpiarCopia($("#d19-cb")); pintar(); revelar(t2);
+      if (reconozco(estado.d19.escena)) { revelar(llevar); anunciar("Tu frase está lista en Para llevar: " + estado.d19.frase); }
     });
   });
-  ta.addEventListener("input", function(){ estado.d19.frase = ta.value; guardar(); });
+  ta.addEventListener("input", function(){ estado.d19.frase = ta.value; estado.d19.editada = true; guardar(); });
   $("#d19-copiar").addEventListener("click", function(){ copiarTexto(ta.value, $("#d19-cb")); });
   $("#d19-copiar2").addEventListener("click", function(){ copiarTexto($("#d19-extra").textContent, $("#d19-cb2")); });
   pintar();
